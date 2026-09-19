@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Тест по маркетингу</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Экран 1: старт -->
+    <div id="start-screen" class="screen">
+      <h1>Тест по маркетингу</h1>
+      <p class="subtitle">10 случайных вопросов: термины, практика и задачи с расчётами.</p>
+      <button id="btn-start" class="btn">Начать тест</button>
+    </div>
+
+    <!-- Экран 2: вопрос -->
+    <div id="quiz-screen" class="screen hidden">
+      <div class="top-row">
+        <span id="progress">Вопрос 1 из 10</span>
+        <span id="level-badge" class="badge">A</span>
+      </div>
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+
+      <h2 id="question-text"></h2>
+
+      <div id="answers"></div>
+
+      <div id="number-box" class="hidden">
+        <input id="number-input" type="text" inputmode="decimal" placeholder="Введите число">
+        <button id="btn-submit" class="btn">Ответить</button>
+      </div>
+
+      <div id="feedback" class="hidden"></div>
+      <button id="btn-next" class="btn hidden">Дальше</button>
+    </div>
+
+    <!-- Экран 3: результат -->
+    <div id="result-screen" class="screen hidden">
+      <h1>Результат</h1>
+      <div id="result-score" class="big-score"></div>
+      <div id="result-levels"></div>
+      <button id="btn-restart" class="btn">Пройти ещё раз</button>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
