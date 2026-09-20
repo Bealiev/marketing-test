@@ -7,8 +7,8 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css">
   <style>
-    .tabs { display: flex; gap: 8px; margin: 0 0 16px; }
-    .tab {
+    .tabs, .modes { display: flex; gap: 8px; margin: 0 0 12px; }
+    .tab, .mode {
       flex: 1;
       padding: 12px 8px;
       border: 2px solid transparent;
@@ -20,16 +20,29 @@
       line-height: 1.25;
       cursor: pointer;
     }
-    .tab.active { border-color: var(--btn); }
+    .mode { font-size: 14px; padding: 10px 8px; }
+    .tab.active, .mode.active { border-color: var(--btn); }
     .btn.secondary { background: var(--card); color: var(--text); }
     .badge { max-width: 65%; text-align: right; line-height: 1.25; }
-    #section-desc { min-height: 3em; }
+    #section-desc { min-height: 2.6em; margin-bottom: 12px; }
+    #mode-desc { margin: 4px 0 12px; font-size: 14px; }
+    #topic-box { margin: 0 0 12px; }
+    #topic-box label { display: block; margin: 0 0 6px; color: var(--hint); font-size: 14px; }
+    #topic-select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--card);
+      border-radius: 12px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <div id="app">
 
-    <!-- Экран 1: старт и выбор раздела -->
+    <!-- Экран 1: старт, выбор раздела и режима -->
     <div id="start-screen" class="screen">
       <h1>Тест по маркетингу</h1>
 
@@ -37,8 +50,19 @@
         <button class="tab active" data-section="basics">Основы маркетинга</button>
         <button class="tab" data-section="course">Курс: модули 1–8</button>
       </div>
-
       <p id="section-desc" class="subtitle"></p>
+
+      <div class="modes">
+        <button class="mode active" data-mode="test">Тест</button>
+        <button class="mode" data-mode="train">Тренировка по теме</button>
+      </div>
+      <p id="mode-desc" class="subtitle"></p>
+
+      <div id="topic-box" class="hidden">
+        <label for="topic-select">Выберите тему:</label>
+        <select id="topic-select"></select>
+      </div>
+
       <button id="btn-start" class="btn">Начать тест</button>
     </div>
 
@@ -61,6 +85,7 @@
 
       <div id="feedback" class="hidden"></div>
       <button id="btn-next" class="btn hidden">Дальше</button>
+      <button id="btn-finish" class="btn secondary hidden">Завершить тренировку</button>
     </div>
 
     <!-- Экран 3: результат -->
@@ -70,7 +95,7 @@
       <div id="result-score" class="big-score"></div>
       <div id="result-levels"></div>
       <button id="btn-restart" class="btn">Пройти ещё раз</button>
-      <button id="btn-change" class="btn secondary">Выбрать другой раздел</button>
+      <button id="btn-change" class="btn secondary">Выбрать другой раздел или тему</button>
     </div>
 
   </div>
