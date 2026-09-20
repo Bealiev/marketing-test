@@ -2,16 +2,16 @@
 const SECTIONS = {
   basics: {
     title: 'Основы маркетинга',
-    description: '10 случайных вопросов: термины, практика и задачи с расчётами.',
+    description: 'Термины, практика и задачи с расчётами.',
     file: 'questions.json',
-    plan: { A: 3, B: 3, C: 4 }, // сколько вопросов каждого уровня
+    plan: { A: 3, B: 3, C: 4 }, // сколько вопросов каждого уровня в тесте
     total: 10,
     levelNames: { A: 'Термины', B: 'Практика', C: 'Задачи' },
     levelPrefix: ''
   },
   course: {
     title: 'Курс: модули 1–8',
-    description: '10 случайных вопросов по всем модулям курса: от мышления до онлайн-маркетинга.',
+    description: 'Вопросы по всем модулям курса: от мышления до онлайн-маркетинга.',
     file: 'questions2.json',
     plan: null, // без деления на уровни: 10 случайных из всех вопросов
     total: 10,
@@ -29,6 +29,11 @@ const SECTIONS = {
   }
 };
 
+const MODE_TEXT = {
+  test: '10 случайных вопросов, в конце — результат.',
+  train: 'Выберите тему и отвечайте без ограничения по числу вопросов. Завершить можно в любой момент.'
+};
+
 // ===== Подключение к Telegram =====
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) {
@@ -39,11 +44,14 @@ if (tg) {
 const $ = (id) => document.getElementById(id);
 
 let currentSection = 'basics';
+let mode = 'test'; // 'test' — тест из 10 вопросов, 'train' — тренировка по теме
+let currentTopic = 'all';
 const cache = {}; // загруженные вопросы по разделам
 
 let quiz = [];
 let current = 0;
 let score = 0;
+let answeredCount = 0;
 let stats = {};
 let answered = false;
 
@@ -68,6 +76,43 @@ function levelLabel(section, level) {
   return section.levelPrefix + level + (name ? ' · ' + name : '');
 }
 
+// ===== Стартовый экран =====
+function updateStartUI() {
+  document.querySelectorAll('.mode').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  $('topic-box').classList.toggle('hidden', mode !== 'train');
+  $('mode-desc').textContent = MODE_TEXT[mode];
+  $('btn-start').textContent = mode === 'train' ? 'Начать тренировку' : 'Начать тест';
+}
+
+function setMode(m) {
+  mode = m;
+  updateStartUI();
+}
+
+// Список тем для тренировки (модули или уровни)
+function buildTopics() {
+  const section = SECTIONS[currentSection];
+  const all = cache[currentSection] || [];
+  const select = $('topic-select');
+  select.innerHTML = '';
+
+  const addOption = (value, label) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    select.appendChild(o);
+  };
+
+  addOption('all', 'Все темы (' + all.length + ')');
+  Object.keys(section.levelNames).forEach((level) => {
+    const n = all.filter((q) => q.level === level).length;
+    if (n > 0) addOption(level, levelLabel(section, level) + ' (' + n + ')');
+  });
+  select.value = 'all';
+}
+
 // ===== Выбор раздела =====
 async function selectSection(key) {
   currentSection = key;
@@ -79,6 +124,7 @@ async function selectSection(key) {
   const desc = $('section-desc');
   desc.textContent = section.description;
   $('btn-start').disabled = true;
+  updateStartUI();
 
   try {
     if (!cache[key]) {
@@ -88,6 +134,7 @@ async function selectSection(key) {
     }
     if (currentSection !== key) return; // пользователь уже переключился на другой раздел
     desc.textContent = section.description + ' Всего вопросов в банке: ' + cache[key].length + '.';
+    buildTopics();
     $('btn-start').disabled = false;
   } catch (e) {
     if (currentSection !== key) return;
@@ -96,7 +143,7 @@ async function selectSection(key) {
   }
 }
 
-// ===== Выбор случайных вопросов =====
+// ===== Выбор случайных вопросов для теста =====
 function pickQuestions(section, all) {
   // Раздел без плана: просто 10 случайных вопросов из всего банка
   if (!section.plan) {
@@ -119,22 +166,29 @@ function pickQuestions(section, all) {
   return shuffle(picked);
 }
 
-// ===== Запуск теста =====
+// ===== Запуск теста или тренировки =====
 function startQuiz() {
   const section = SECTIONS[currentSection];
   const all = cache[currentSection];
   if (!all || all.length === 0) return;
 
-  quiz = pickQuestions(section, all);
+  if (mode === 'train') {
+    currentTopic = $('topic-select').value || 'all';
+    // все вопросы выбранной темы в случайном порядке
+    quiz = shuffle(all.filter((q) => currentTopic === 'all' || q.level === currentTopic));
+  } else {
+    currentTopic = 'all';
+    quiz = pickQuestions(section, all);
+  }
+  if (quiz.length === 0) return;
+
   current = 0;
   score = 0;
+  answeredCount = 0;
   stats = {};
   Object.keys(section.levelNames).forEach((l) => { stats[l] = { right: 0, total: 0 }; });
-  quiz.forEach((q) => {
-    if (!stats[q.level]) stats[q.level] = { right: 0, total: 0 };
-    stats[q.level].total++;
-  });
 
+  $('btn-finish').classList.toggle('hidden', mode !== 'train');
   showScreen('quiz-screen');
   showQuestion();
 }
@@ -212,8 +266,11 @@ function submitNumber() {
 // ===== Запись результата ответа =====
 function registerAnswer(isCorrect, correctText) {
   answered = true;
+  answeredCount++;
   const q = quiz[current];
 
+  if (!stats[q.level]) stats[q.level] = { right: 0, total: 0 };
+  stats[q.level].total++;
   if (isCorrect) {
     score++;
     stats[q.level].right++;
@@ -231,10 +288,15 @@ function registerAnswer(isCorrect, correctText) {
 // ===== Экран результата =====
 function showResult() {
   const section = SECTIONS[currentSection];
-  const total = quiz.length;
-  const percent = Math.round((score / total) * 100);
+  const total = answeredCount;
+  const percent = total > 0 ? Math.round((score / total) * 100) : 0;
 
-  $('result-section').textContent = section.title;
+  let title = section.title;
+  if (mode === 'train') {
+    title += ' · тренировка';
+    if (currentTopic !== 'all') title += ' · ' + levelLabel(section, currentTopic);
+  }
+  $('result-section').textContent = title;
   $('result-score').textContent = score + ' из ' + total + ' — ' + percent + '%';
 
   const box = $('result-levels');
@@ -263,10 +325,20 @@ function showResult() {
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => selectSection(tab.dataset.section));
 });
+document.querySelectorAll('.mode').forEach((b) => {
+  b.addEventListener('click', () => setMode(b.dataset.mode));
+});
 
 $('btn-start').addEventListener('click', startQuiz);
 $('btn-restart').addEventListener('click', startQuiz);
 $('btn-change').addEventListener('click', () => showScreen('start-screen'));
+$('btn-finish').addEventListener('click', () => {
+  if (answeredCount === 0) {
+    showScreen('start-screen');
+  } else {
+    showResult();
+  }
+});
 $('btn-submit').addEventListener('click', submitNumber);
 $('number-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') submitNumber();
