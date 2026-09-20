@@ -6,14 +6,39 @@
   <title>Тест по маркетингу</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .tabs { display: flex; gap: 8px; margin: 0 0 16px; }
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.25;
+      cursor: pointer;
+    }
+    .tab.active { border-color: var(--btn); }
+    .btn.secondary { background: var(--card); color: var(--text); }
+    .badge { max-width: 65%; text-align: right; line-height: 1.25; }
+    #section-desc { min-height: 3em; }
+  </style>
 </head>
 <body>
   <div id="app">
 
-    <!-- Экран 1: старт -->
+    <!-- Экран 1: старт и выбор раздела -->
     <div id="start-screen" class="screen">
       <h1>Тест по маркетингу</h1>
-      <p class="subtitle">10 случайных вопросов: термины, практика и задачи с расчётами.</p>
+
+      <div class="tabs">
+        <button class="tab active" data-section="basics">Основы маркетинга</button>
+        <button class="tab" data-section="course">Курс: модули 1–8</button>
+      </div>
+
+      <p id="section-desc" class="subtitle"></p>
       <button id="btn-start" class="btn">Начать тест</button>
     </div>
 
@@ -41,9 +66,11 @@
     <!-- Экран 3: результат -->
     <div id="result-screen" class="screen hidden">
       <h1>Результат</h1>
+      <div id="result-section" class="subtitle"></div>
       <div id="result-score" class="big-score"></div>
       <div id="result-levels"></div>
       <button id="btn-restart" class="btn">Пройти ещё раз</button>
+      <button id="btn-change" class="btn secondary">Выбрать другой раздел</button>
     </div>
 
   </div>

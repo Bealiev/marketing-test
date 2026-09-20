@@ -1,6 +1,33 @@
-// ===== Настройки =====
-const TEST_PLAN = { A: 3, B: 3, C: 4 }; // сколько вопросов каждого уровня
-const LEVEL_NAMES = { A: 'Термины', B: 'Практика', C: 'Задачи' };
+// ===== Разделы теста =====
+const SECTIONS = {
+  basics: {
+    title: 'Основы маркетинга',
+    description: '10 случайных вопросов: термины, практика и задачи с расчётами.',
+    file: 'questions.json',
+    plan: { A: 3, B: 3, C: 4 }, // сколько вопросов каждого уровня
+    total: 10,
+    levelNames: { A: 'Термины', B: 'Практика', C: 'Задачи' },
+    levelPrefix: ''
+  },
+  course: {
+    title: 'Курс: модули 1–8',
+    description: '10 случайных вопросов по всем модулям курса: от мышления до онлайн-маркетинга.',
+    file: 'questions2.json',
+    plan: null, // без деления на уровни: 10 случайных из всех вопросов
+    total: 10,
+    levelNames: {
+      '1': 'Мышление',
+      '2': 'Дорожная карта маркетолога',
+      '3': 'План работ',
+      '4': 'Начало работы с проектом',
+      '5': 'Теория маркетинга',
+      '6': 'Команда',
+      '7': 'Оффлайн-маркетинг',
+      '8': 'Онлайн-маркетинг'
+    },
+    levelPrefix: 'Модуль '
+  }
+};
 
 // ===== Подключение к Telegram =====
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -11,7 +38,9 @@ if (tg) {
 
 const $ = (id) => document.getElementById(id);
 
-let allQuestions = [];
+let currentSection = 'basics';
+const cache = {}; // загруженные вопросы по разделам
+
 let quiz = [];
 let current = 0;
 let score = 0;
@@ -34,21 +63,57 @@ function showScreen(id) {
   window.scrollTo(0, 0);
 }
 
-// ===== Выбор случайных вопросов =====
-function pickQuestions() {
-  const total = Object.values(TEST_PLAN).reduce((a, b) => a + b, 0);
-  let picked = [];
+function levelLabel(section, level) {
+  const name = section.levelNames[level] || '';
+  return section.levelPrefix + level + (name ? ' · ' + name : '');
+}
 
-  Object.keys(TEST_PLAN).forEach((level) => {
-    const pool = shuffle(allQuestions.filter((q) => q.level === level));
-    picked = picked.concat(pool.slice(0, TEST_PLAN[level]));
+// ===== Выбор раздела =====
+async function selectSection(key) {
+  currentSection = key;
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.section === key);
+  });
+
+  const section = SECTIONS[key];
+  const desc = $('section-desc');
+  desc.textContent = section.description;
+  $('btn-start').disabled = true;
+
+  try {
+    if (!cache[key]) {
+      const response = await fetch(section.file, { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      cache[key] = await response.json();
+    }
+    if (currentSection !== key) return; // пользователь уже переключился на другой раздел
+    desc.textContent = section.description + ' Всего вопросов в банке: ' + cache[key].length + '.';
+    $('btn-start').disabled = false;
+  } catch (e) {
+    if (currentSection !== key) return;
+    desc.textContent =
+      'Не удалось загрузить вопросы (файл ' + section.file + '). Проверьте, что файл загружен в репозиторий.';
+  }
+}
+
+// ===== Выбор случайных вопросов =====
+function pickQuestions(section, all) {
+  // Раздел без плана: просто 10 случайных вопросов из всего банка
+  if (!section.plan) {
+    return shuffle(all).slice(0, section.total);
+  }
+
+  let picked = [];
+  Object.keys(section.plan).forEach((level) => {
+    const pool = shuffle(all.filter((q) => q.level === level));
+    picked = picked.concat(pool.slice(0, section.plan[level]));
   });
 
   // Если вопросов какого-то уровня не хватило, добираем из остальных
-  if (picked.length < total) {
+  if (picked.length < section.total) {
     const usedIds = new Set(picked.map((q) => q.id));
-    const rest = shuffle(allQuestions.filter((q) => !usedIds.has(q.id)));
-    picked = picked.concat(rest.slice(0, total - picked.length));
+    const rest = shuffle(all.filter((q) => !usedIds.has(q.id)));
+    picked = picked.concat(rest.slice(0, section.total - picked.length));
   }
 
   return shuffle(picked);
@@ -56,27 +121,33 @@ function pickQuestions() {
 
 // ===== Запуск теста =====
 function startQuiz() {
-  quiz = pickQuestions();
+  const section = SECTIONS[currentSection];
+  const all = cache[currentSection];
+  if (!all || all.length === 0) return;
+
+  quiz = pickQuestions(section, all);
   current = 0;
   score = 0;
   stats = {};
-  Object.keys(TEST_PLAN).forEach((l) => { stats[l] = { right: 0, total: 0 }; });
+  Object.keys(section.levelNames).forEach((l) => { stats[l] = { right: 0, total: 0 }; });
   quiz.forEach((q) => {
     if (!stats[q.level]) stats[q.level] = { right: 0, total: 0 };
     stats[q.level].total++;
   });
+
   showScreen('quiz-screen');
   showQuestion();
 }
 
 // ===== Показ вопроса =====
 function showQuestion() {
+  const section = SECTIONS[currentSection];
   const q = quiz[current];
   answered = false;
 
   $('progress').textContent = 'Вопрос ' + (current + 1) + ' из ' + quiz.length;
   $('progress-fill').style.width = (current / quiz.length) * 100 + '%';
-  $('level-badge').textContent = q.level + ' · ' + (LEVEL_NAMES[q.level] || '');
+  $('level-badge').textContent = levelLabel(section, q.level);
   $('question-text').textContent = q.question;
 
   $('feedback').className = 'hidden';
@@ -118,7 +189,7 @@ function showQuestion() {
   }
 }
 
-// ===== Ответ на числовую задачу =====
+// ===== Ответ на числовую задачу (если такие вопросы появятся) =====
 function submitNumber() {
   if (answered) return;
   const q = quiz[current];
@@ -159,8 +230,11 @@ function registerAnswer(isCorrect, correctText) {
 
 // ===== Экран результата =====
 function showResult() {
+  const section = SECTIONS[currentSection];
   const total = quiz.length;
   const percent = Math.round((score / total) * 100);
+
+  $('result-section').textContent = section.title;
   $('result-score').textContent = score + ' из ' + total + ' — ' + percent + '%';
 
   const box = $('result-levels');
@@ -171,7 +245,8 @@ function showResult() {
     row.className = 'level-row';
 
     const name = document.createElement('span');
-    name.textContent = level + ' — ' + (LEVEL_NAMES[level] || '');
+    const levelName = section.levelNames[level] || '';
+    name.textContent = section.levelPrefix + level + (levelName ? ' — ' + levelName : '');
 
     const value = document.createElement('strong');
     value.textContent = stats[level].right + ' из ' + stats[level].total;
@@ -185,8 +260,13 @@ function showResult() {
 }
 
 // ===== Кнопки =====
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => selectSection(tab.dataset.section));
+});
+
 $('btn-start').addEventListener('click', startQuiz);
 $('btn-restart').addEventListener('click', startQuiz);
+$('btn-change').addEventListener('click', () => showScreen('start-screen'));
 $('btn-submit').addEventListener('click', submitNumber);
 $('number-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') submitNumber();
@@ -200,18 +280,5 @@ $('btn-next').addEventListener('click', () => {
   }
 });
 
-// ===== Загрузка вопросов =====
-async function loadQuestions() {
-  $('btn-start').disabled = true;
-  try {
-    const response = await fetch('questions.json', { cache: 'no-store' });
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    allQuestions = await response.json();
-    $('btn-start').disabled = false;
-  } catch (e) {
-    document.querySelector('#start-screen .subtitle').textContent =
-      'Не удалось загрузить вопросы. Проверьте файл questions.json.';
-  }
-}
-
-loadQuestions();
+// ===== Старт приложения =====
+selectSection('basics');
