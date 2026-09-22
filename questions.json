@@ -120,29 +120,3 @@
 ("A","Что такое РСЯ?",
  ["Система размещения рекламы на сервисах Яндекса и партнёров","Система создания доменов","Сервис создания дизайна","Нет правильного ответа"],0),
 ]
-
-out = []
-for i, (level, q, answers, correct) in enumerate(rows, start=1):
-    out.append({"id": i, "level": level, "type": "choice", "question": q, "answers": answers, "correct": correct})
-
-print(len(out))
-from collections import Counter
-print(Counter(r[0] for r in rows))
-
-with open('/mnt/user-data/outputs/questions.json', 'w', encoding='utf-8') as f:
-    f.write('[\n')
-    f.write(',\n'.join(json.dumps(o, ensure_ascii=False, separators=(',', ':')) for o in out))
-    f.write('\n]\n')
-
-data = json.load(open('/mnt/user-data/outputs/questions.json', encoding='utf-8'))
-assert len(data) == 60
-for o in data:
-    assert len(o['answers']) == 4 and 0 <= o['correct'] <= 3
-print('OK, bytes:', len(open('/mnt/user-data/outputs/questions.json','rb').read()))
-PYEOF
-python3 /home/claude/newbasics.py
-Output
-
-60
-Counter({'A': 39, 'B': 14, 'C': 7})
-OK, bytes: 25957
